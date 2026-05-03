@@ -8,3 +8,4 @@ export * from './signature.js';
 export * from './engagement-event.js';
 export * from './tenant-settings.js';
 export * from './user-setting.js';
+export * from './whoami.js';

@@ -14,7 +14,7 @@
 
 import { z } from 'zod';
 
-import { BackendClient } from '../backend/client.js';
+import { BackendClient, DEFAULT_BACKEND_URL } from '../backend/client.js';
 import { TenantSettingsCache } from '../settings/tenant.js';
 import {
   effectiveAggressiveness,
@@ -207,38 +207,23 @@ const shortenReason = (text: string): string => {
 
 interface HookEnv {
   readonly SENIORIFY_BACKEND_URL: string;
-  readonly SENIORIFY_AUTH_TOKEN: string;
-  readonly SENIORIFY_TENANT_ID: TenantId;
-  readonly SENIORIFY_USER_ID: UserId;
+  readonly SENIORIFY_TOKEN: string;
 }
 
 const requireEnv = (): Result<HookEnv, BackendError> => {
   const env = process.env;
-  const url = env.SENIORIFY_BACKEND_URL;
-  const token = env.SENIORIFY_AUTH_TOKEN;
-  const tenant = env.SENIORIFY_TENANT_ID;
-  const user = env.SENIORIFY_USER_ID;
-  if (
-    url === undefined ||
-    token === undefined ||
-    tenant === undefined ||
-    user === undefined ||
-    url.length === 0 ||
-    token.length === 0 ||
-    tenant.length === 0 ||
-    user.length === 0
-  ) {
+  const url = env.SENIORIFY_BACKEND_URL ?? DEFAULT_BACKEND_URL;
+  const token = env.SENIORIFY_TOKEN;
+  if (token === undefined || token.length === 0 || url.length === 0) {
     return err({
       code: 'tenant-unresolved',
       message:
-        'hook requires SENIORIFY_BACKEND_URL, SENIORIFY_AUTH_TOKEN, SENIORIFY_TENANT_ID, SENIORIFY_USER_ID',
+        'hook requires SENIORIFY_TOKEN (SENIORIFY_BACKEND_URL is optional; defaults to the hosted backend)',
     });
   }
   return ok({
     SENIORIFY_BACKEND_URL: url,
-    SENIORIFY_AUTH_TOKEN: token,
-    SENIORIFY_TENANT_ID: tenant as TenantId,
-    SENIORIFY_USER_ID: user as UserId,
+    SENIORIFY_TOKEN: token,
   });
 };
 
@@ -274,17 +259,35 @@ export const main = async (): Promise<void> => {
   const sessionId = parsed.session_id as SessionId;
   const state = await loadState(sessionId);
 
+  // The hook has no tenant yet — whoami resolves it. We construct the
+  // client with a placeholder tenantId for the whoami call (which omits
+  // the X-Tenant-Id header), then rebuild it with the resolved tenant.
+  // Future optimization: a session-scoped cache could amortize whoami
+  // across hook invocations within one Claude Code session (the hook is
+  // invoked per-tool-call; for v0 we accept the per-call cost).
+  const bootstrapClient = new BackendClient({
+    baseUrl: env.SENIORIFY_BACKEND_URL,
+    authToken: env.SENIORIFY_TOKEN,
+    tenantId: 'unresolved',
+  });
+  const whoamiRes = await bootstrapClient.whoami();
+  if (!whoamiRes.ok) {
+    writeBlock(`tenant-unresolved: ${whoamiRes.error.message}`);
+    return;
+  }
+  const { tenant_id: tenantId, user_id: userId } = whoamiRes.value;
+
   const client = new BackendClient({
     baseUrl: env.SENIORIFY_BACKEND_URL,
-    authToken: env.SENIORIFY_AUTH_TOKEN,
-    tenantId: env.SENIORIFY_TENANT_ID,
+    authToken: env.SENIORIFY_TOKEN,
+    tenantId,
   });
   const tenantCache = new TenantSettingsCache(client);
   const userResolver = new UserSettingResolver(client);
 
   const [settingsRes, userRes] = await Promise.all([
-    tenantCache.get(env.SENIORIFY_TENANT_ID),
-    userResolver.fetch(env.SENIORIFY_USER_ID),
+    tenantCache.get(tenantId),
+    userResolver.fetch(userId),
   ]);
   if (!settingsRes.ok) {
     writeBlock('tenant settings unavailable');
@@ -305,8 +308,8 @@ export const main = async (): Promise<void> => {
       suspended: false,
       force_engage_pending: state.force_engage_pending,
       emitter,
-      tenant_id: env.SENIORIFY_TENANT_ID,
-      user_id: env.SENIORIFY_USER_ID,
+      tenant_id: tenantId,
+      user_id: userId,
       session_id: sessionId,
     },
     parsed,

@@ -28,6 +28,14 @@ import { EngagementEventEmitter } from '../../src/telemetry/engagement.js';
 import type { SessionId, TenantId, UserId } from '../../src/shared/types.js';
 
 interface Bootstrapped {
+  readonly admin_token: string;
+  // tenant_id + admin_user_id remain in the bootstrap JSON (the bootstrap
+  // script itself returns them) but the integration test no longer reads
+  // them — it derives the same identity via whoami, which is the path
+  // production Claude Code sessions take after the hosted-SaaS pivot.
+}
+
+interface ResolvedIdentity {
   readonly tenant_id: TenantId;
   readonly admin_user_id: UserId;
   readonly admin_token: string;
@@ -35,12 +43,26 @@ interface Bootstrapped {
 
 const backendUrl = process.env.SENIORIFY_BACKEND_URL ?? 'http://localhost:8787';
 
-let tenant: Bootstrapped;
+let tenant: ResolvedIdentity;
 let client: BackendClient;
 
 beforeAll(async () => {
   const file = process.env.SENIORIFY_TEST_TENANT_FILE ?? 'test-tenant-bootstrap.json';
-  tenant = JSON.parse(await readFile(file, 'utf8')) as Bootstrapped;
+  const bootstrapped = JSON.parse(await readFile(file, 'utf8')) as Bootstrapped;
+  // Resolve tenant + user via whoami — the same flow Claude Code uses.
+  const bootstrap = new BackendClient({
+    baseUrl: backendUrl,
+    authToken: bootstrapped.admin_token,
+    tenantId: 'unresolved',
+  });
+  const whoami = await bootstrap.whoami();
+  expect(whoami.ok).toBe(true);
+  if (!whoami.ok) throw new Error('whoami failed in integration setup');
+  tenant = {
+    tenant_id: whoami.value.tenant_id,
+    admin_user_id: whoami.value.user_id,
+    admin_token: bootstrapped.admin_token,
+  };
   client = new BackendClient({
     baseUrl: backendUrl,
     authToken: tenant.admin_token,

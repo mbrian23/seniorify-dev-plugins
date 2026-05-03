@@ -20,7 +20,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { type ZodTypeAny } from 'zod';
 
-import { BackendClient } from '../backend/client.js';
+import { BackendClient, DEFAULT_BACKEND_URL } from '../backend/client.js';
 import { BudgetReservationClient } from '../budget/reservation.js';
 import { err, ok, type Result } from '../shared/result.js';
 
@@ -158,38 +158,23 @@ const zodToJsonSchema = (schema: ZodTypeAny): Record<string, unknown> => {
 
 interface ServerEnv {
   readonly SENIORIFY_BACKEND_URL: string;
-  readonly SENIORIFY_AUTH_TOKEN: string;
-  readonly SENIORIFY_TENANT_ID: string;
-  readonly SENIORIFY_USER_ID: string;
+  readonly SENIORIFY_TOKEN: string;
 }
 
 const requireEnv = (): Result<ServerEnv, BackendError> => {
   const env = process.env;
-  const url = env.SENIORIFY_BACKEND_URL;
-  const token = env.SENIORIFY_AUTH_TOKEN;
-  const tenant = env.SENIORIFY_TENANT_ID;
-  const user = env.SENIORIFY_USER_ID;
-  if (
-    url === undefined ||
-    token === undefined ||
-    tenant === undefined ||
-    user === undefined ||
-    url.length === 0 ||
-    token.length === 0 ||
-    tenant.length === 0 ||
-    user.length === 0
-  ) {
+  const url = env.SENIORIFY_BACKEND_URL ?? DEFAULT_BACKEND_URL;
+  const token = env.SENIORIFY_TOKEN;
+  if (token === undefined || token.length === 0 || url.length === 0) {
     return err({
       code: 'tenant-unresolved',
       message:
-        'MCP server requires SENIORIFY_BACKEND_URL, SENIORIFY_AUTH_TOKEN, SENIORIFY_TENANT_ID, SENIORIFY_USER_ID',
+        'MCP server requires SENIORIFY_TOKEN (SENIORIFY_BACKEND_URL is optional; defaults to the hosted backend)',
     });
   }
   return ok({
     SENIORIFY_BACKEND_URL: url,
-    SENIORIFY_AUTH_TOKEN: token,
-    SENIORIFY_TENANT_ID: tenant,
-    SENIORIFY_USER_ID: user,
+    SENIORIFY_TOKEN: token,
   });
 };
 
@@ -200,10 +185,28 @@ export const main = async (): Promise<void> => {
     process.exit(2);
   }
   const env = envRes.value;
+  // Bootstrap with placeholder tenant; whoami resolves it before we accept
+  // any tool calls. Resolved identity is process-scoped: the MCP server is
+  // a long-lived stdio process per Claude Code session, so one whoami at
+  // startup covers the lifetime.
+  const bootstrapClient = new BackendClient({
+    baseUrl: env.SENIORIFY_BACKEND_URL,
+    authToken: env.SENIORIFY_TOKEN,
+    tenantId: 'unresolved',
+  });
+  const whoamiRes = await bootstrapClient.whoami();
+  if (!whoamiRes.ok) {
+    process.stderr.write(
+      `seniorify mcp: tenant-unresolved: ${whoamiRes.error.message}\n`,
+    );
+    process.exit(2);
+  }
+  const { tenant_id: tenantId, user_id: userId } = whoamiRes.value;
+
   const client = new BackendClient({
     baseUrl: env.SENIORIFY_BACKEND_URL,
-    authToken: env.SENIORIFY_AUTH_TOKEN,
-    tenantId: env.SENIORIFY_TENANT_ID,
+    authToken: env.SENIORIFY_TOKEN,
+    tenantId,
   });
   const compat = await client.ensureCompatible();
   if (!compat.ok) {
@@ -213,8 +216,8 @@ export const main = async (): Promise<void> => {
   const deps: ServerDeps = {
     client,
     budget: new BudgetReservationClient(client),
-    resolvedTenantId: env.SENIORIFY_TENANT_ID as TenantId,
-    resolvedUserId: env.SENIORIFY_USER_ID as UserId,
+    resolvedTenantId: tenantId,
+    resolvedUserId: userId,
   };
   const server = buildServer(deps);
   const transport = new StdioServerTransport();

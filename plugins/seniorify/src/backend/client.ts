@@ -14,9 +14,18 @@ import { z } from 'zod';
 import { err, ok, type Result } from '../shared/result.js';
 
 import { backendError } from './errors.js';
+import { whoamiResponseSchema, type WhoamiResponse } from './schemas/whoami.js';
 
 import type { BackendError } from './errors.js';
 import type { Dispatcher } from 'undici';
+
+/**
+ * Default base URL for the hosted Seniorify backend. Override via
+ * `SENIORIFY_BACKEND_URL` for local / staging / self-hosted deployments.
+ * Drift entry (2026-05-03): the hosted-SaaS pivot makes this the default
+ * because the original plan envisioned manual env-var configuration.
+ */
+export const DEFAULT_BACKEND_URL = 'https://api.seniorify.dev';
 
 const DEFAULT_RETRIES = 3;
 const BASE_BACKOFF_MS = 100;
@@ -45,6 +54,13 @@ export interface RequestOptions {
   readonly idempotencyKey?: string;
   /** Caller-supplied retry override; otherwise uses config.maxRetries. */
   readonly retries?: number;
+  /**
+   * Suppress the `X-Tenant-Id` header for endpoints that *resolve* the
+   * tenant (currently only `GET /v1/whoami` — sending it would be
+   * circular). Default false; flip to true at the one call site that
+   * needs it.
+   */
+  readonly omitTenantHeader?: boolean;
 }
 
 const versionHandshakeSchema = z.object({
@@ -97,6 +113,31 @@ export class BackendClient {
     return ok(undefined);
   }
 
+  /**
+   * Resolves the active session's tenant + user from the bearer token.
+   * Drift entry (2026-05-03): hosted-SaaS pivot replaced manual
+   * SENIORIFY_TENANT_ID + SENIORIFY_USER_ID env vars with this lookup.
+   * Sends Authorization but NOT X-Tenant-Id — sending the tenant header
+   * would be circular (whoami's whole purpose is to learn the tenant).
+   */
+  async whoami(): Promise<Result<WhoamiResponse, BackendError>> {
+    const res = await this.request<unknown>({
+      method: 'GET',
+      path: '/v1/whoami',
+      omitTenantHeader: true,
+    });
+    if (!res.ok) return res;
+    const parsed = whoamiResponseSchema.safeParse(res.value);
+    if (!parsed.success) {
+      return err(
+        backendError('schema-mismatch', 'whoami response did not parse', {
+          details: { issues: parsed.error.issues },
+        }),
+      );
+    }
+    return ok(parsed.data);
+  }
+
   async request<T>(opts: RequestOptions): Promise<Result<T, BackendError>> {
     const isMutating = opts.method !== 'GET';
     const idempotencyKey = isMutating
@@ -105,7 +146,7 @@ export class BackendClient {
 
     const headers: Record<string, string> = {
       authorization: `Bearer ${this.#cfg.authToken}`,
-      'x-tenant-id': this.#cfg.tenantId,
+      ...(opts.omitTenantHeader === true ? {} : { 'x-tenant-id': this.#cfg.tenantId }),
       'content-type': 'application/json',
       ...(idempotencyKey !== undefined ? { 'idempotency-key': idempotencyKey } : {}),
       ...(this.#cfg.userAgent !== undefined ? { 'user-agent': this.#cfg.userAgent } : {}),

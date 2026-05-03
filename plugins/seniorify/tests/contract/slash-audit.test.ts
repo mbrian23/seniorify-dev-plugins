@@ -63,7 +63,7 @@ describe('runAuditCmd — force-engage flag arming', () => {
     // This test verifies behavior end-to-end: arming completes without env
     // vars (SENIORIFY_BACKEND_URL etc.) being set.
     delete process.env.SENIORIFY_BACKEND_URL;
-    delete process.env.SENIORIFY_AUTH_TOKEN;
+    delete process.env.SENIORIFY_TOKEN;
     const out = await runAuditCmd({ session_id: 'ses-no-env' as SessionId, body: '' });
     expect(out.user_message).toContain('Force-audit armed');
   });
