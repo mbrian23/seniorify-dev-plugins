@@ -1,0 +1,19 @@
+{
+  "name": "seniorify",
+  "owner": {
+    "name": "Seniorify",
+    "url": "https://seniorify.dev"
+  },
+  "metadata": {
+    "version": "0.1.0",
+    "description": "Socratic plan-audit before non-trivial code is written. Help juniors take responsibility; give managers a readable audit trail."
+  },
+  "plugins": [
+    {
+      "name": "seniorify",
+      "source": "./plugins/seniorify",
+      "description": "Plan-audit for AI-assisted development. PreToolUse hook + MCP server + slash commands.",
+      "tags": ["plan-audit", "engineering-management", "code-quality", "audit-trail"]
+    }
+  ]
+}
