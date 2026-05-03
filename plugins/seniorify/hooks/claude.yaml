@@ -1,0 +1,9 @@
+# Source-of-truth for Claude Code hook config.
+# `pnpm run build:hooks` transpiles this to hooks/hooks.json (gitignored).
+hooks:
+  PreToolUse:
+    - matcher: Edit|Write|MultiEdit|NotebookEdit|Bash
+      hooks:
+        - type: command
+          command: node "${CLAUDE_PLUGIN_ROOT}/dist/hook/pretooluse.js"
+          timeout: 5
