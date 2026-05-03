@@ -84,7 +84,7 @@ describe('BudgetReservationClient', () => {
 describe('withReservation (Constitution §VIII NON-NEGOTIABLE)', () => {
   it('does NOT issue the metered call when reservation is refused', async () => {
     const budget = mkBudget(200, '{"granted":false,"reason":"per-seat-ceiling-reached"}');
-    const meteredSpy = vi.fn(() => Promise.resolve(ok('SHOULD-NEVER-RETURN' as unknown)));
+    const meteredSpy = vi.fn(() => Promise.resolve(ok('SHOULD-NEVER-RETURN')));
     const res = await withReservation(budget, reserveInput, meteredSpy);
     expect(meteredSpy).not.toHaveBeenCalled();
     expect(res.ok).toBe(false);
@@ -102,7 +102,7 @@ describe('withReservation (Constitution §VIII NON-NEGOTIABLE)', () => {
 
   it('propagates backend errors without issuing the metered call', async () => {
     const budget = mkBudget(503, '');
-    const meteredSpy = vi.fn(() => Promise.resolve(ok('NEVER' as unknown)));
+    const meteredSpy = vi.fn(() => Promise.resolve(ok('NEVER')));
     const res = await withReservation(budget, reserveInput, meteredSpy);
     expect(meteredSpy).not.toHaveBeenCalled();
     expect(res.ok).toBe(false);

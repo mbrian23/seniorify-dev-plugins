@@ -23,10 +23,6 @@
     }
   },
   "commands": [
-    "./commands/audit.md",
-    "./commands/skip.md",
-    "./commands/suspend.md",
-    "./commands/resume.md",
-    "./commands/status.md"
+    "./commands/audit.md"
   ]
 }

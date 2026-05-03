@@ -27,7 +27,7 @@ const mockTransport = (responses: FakeResponse[]): {
         statusCode: r.statusCode,
         body: { text: () => Promise.resolve(r.body) },
       });
-    }) as unknown as (...args: unknown[]) => Promise<{ statusCode: number; body: { text: () => Promise<string> } }>,
+    }),
   };
 };
 
