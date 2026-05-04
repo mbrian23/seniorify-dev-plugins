@@ -141,7 +141,7 @@ describe('BackendClient', () => {
     // Exercises the status-only fallback by returning a non-JSON body so
     // #parseErrorBody returns undefined and the caller falls through to
     // the status-keyed mapping. Pins contracts/error-codes.md splits.
-    const cases: Array<{ status: number; expectedCode: string }> = [
+    const cases: { status: number; expectedCode: string }[] = [
       { status: 401, expectedCode: 'auth-failed' },
       { status: 403, expectedCode: 'cross-tenant-rejection' },
       { status: 404, expectedCode: 'cross-tenant-rejection' },
