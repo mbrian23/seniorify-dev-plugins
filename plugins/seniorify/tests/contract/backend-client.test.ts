@@ -136,4 +136,26 @@ describe('BackendClient', () => {
     const res = await client.ensureCompatible();
     expect(res.ok).toBe(true);
   });
+
+  describe('#mapClientError fallback (when typed error body is unparseable)', () => {
+    // Exercises the status-only fallback by returning a non-JSON body so
+    // #parseErrorBody returns undefined and the caller falls through to
+    // the status-keyed mapping. Pins contracts/error-codes.md splits.
+    const cases: Array<{ status: number; expectedCode: string }> = [
+      { status: 401, expectedCode: 'auth-failed' },
+      { status: 403, expectedCode: 'cross-tenant-rejection' },
+      { status: 404, expectedCode: 'cross-tenant-rejection' },
+      { status: 409, expectedCode: 'already-signed' },
+      { status: 422, expectedCode: 'invalid-input' },
+    ];
+    for (const { status, expectedCode } of cases) {
+      it(`HTTP ${status} → ${expectedCode}`, async () => {
+        const t = mockTransport([{ statusCode: status, body: 'not-json' }]);
+        const client = mkClient(t.fn);
+        const res = await client.request({ method: 'GET', path: '/v1/anything' });
+        expect(res.ok).toBe(false);
+        if (!res.ok) expect(res.error.code).toBe(expectedCode);
+      });
+    }
+  });
 });

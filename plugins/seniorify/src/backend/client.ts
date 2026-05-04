@@ -222,9 +222,18 @@ export class BackendClient {
     return Math.min(exp + jitter, MAX_BACKOFF_MS);
   }
 
+  // Status-to-code fallback used when the backend's typed JSON error body
+  // can't be parsed. The body usually carries the real `code`; this only
+  // fires on malformed/empty error responses. Per
+  // specs/002-backend-mvp/contracts/error-codes.md:
+  //   401 → auth-failed (most common 401 reason)
+  //   403 → cross-tenant-rejection (fallback for forbidden/role mismatches)
+  //   404 → cross-tenant-rejection (canonical 404 code; admin authority is
+  //         intra-tenant — backend hides existence of foreign resources)
   #mapClientError(status: number): BackendError['code'] {
-    if (status === 401 || status === 403) return 'cross-tenant-rejection';
-    if (status === 404) return 'plan-not-found';
+    if (status === 401) return 'auth-failed';
+    if (status === 403) return 'cross-tenant-rejection';
+    if (status === 404) return 'cross-tenant-rejection';
     if (status === 409) return 'already-signed';
     if (status === 422) return 'invalid-input';
     return 'invalid-input';

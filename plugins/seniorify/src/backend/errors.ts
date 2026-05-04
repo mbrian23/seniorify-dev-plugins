@@ -2,6 +2,7 @@
 // per Constitution §III. Never thrown.
 
 export type BackendErrorCode =
+  | 'auth-failed'
   | 'tenant-unresolved'
   | 'user-unresolved'
   | 'cross-tenant-rejection'
