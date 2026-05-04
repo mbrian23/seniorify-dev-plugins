@@ -91,7 +91,7 @@ export class BackendClient {
    */
   async ensureCompatible(): Promise<Result<void, BackendError>> {
     if (this.#handshakeChecked) return ok(undefined);
-    const res = await this.request<unknown>({ method: 'GET', path: '/v1/_meta/version' });
+    const res = await this.request<unknown>({ method: 'GET', path: '/v1/meta/version' });
     if (!res.ok) return res;
     const parsed = versionHandshakeSchema.safeParse(res.value);
     if (!parsed.success) {
