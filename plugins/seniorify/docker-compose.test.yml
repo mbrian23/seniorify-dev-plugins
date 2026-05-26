@@ -1,0 +1,33 @@
+services:
+  backend:
+    image: seniorify/backend:test
+    container_name: seniorify-backend-test
+    environment:
+      - NODE_ENV=test
+      - LOG_LEVEL=warn
+      - DATABASE_URL=postgres://seniorify:seniorify@db:5432/seniorify_test
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8787:8787"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8787/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  db:
+    image: postgres:16-alpine
+    container_name: seniorify-db-test
+    environment:
+      - POSTGRES_USER=seniorify
+      - POSTGRES_PASSWORD=seniorify
+      - POSTGRES_DB=seniorify_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seniorify -d seniorify_test"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data

@@ -1,0 +1,28 @@
+{
+  "name": "seniorify",
+  "version": "0.1.0",
+  "description": "Socratic plan-audit before non-trivial code is written. PreToolUse hook + MCP server + slash commands.",
+  "author": {
+    "name": "Seniorify",
+    "url": "https://seniorify.dev"
+  },
+  "homepage": "https://seniorify.dev",
+  "repository": "https://github.com/mbrian23/seniorify-dev",
+  "license": "MIT",
+  "keywords": [
+    "plan-audit",
+    "ai-governance",
+    "code-quality",
+    "engineering-management",
+    "audit-trail"
+  ],
+  "mcpServers": {
+    "seniorify": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/mcp/server.js"]
+    }
+  },
+  "commands": [
+    "./commands/audit.md"
+  ]
+}

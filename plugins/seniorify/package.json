@@ -1,0 +1,40 @@
+{
+  "name": "@seniorify/claude-code-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Claude Code plugin surface for Seniorify plan-audit (PreToolUse hook + MCP server + slash commands)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0 <23"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.ts\"",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:contract": "vitest run --project contract",
+    "test:integration": "vitest run --project integration",
+    "test:watch": "vitest",
+    "backend:up": "docker compose -f docker-compose.test.yml up -d --wait",
+    "backend:down": "docker compose -f docker-compose.test.yml down -v",
+    "bootstrap:test-tenant": "tsx scripts/bootstrap-test-tenant.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.0.4",
+    "undici": "6.21.0",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@types/node": "22.9.0",
+    "@typescript-eslint/eslint-plugin": "8.15.0",
+    "@typescript-eslint/parser": "8.15.0",
+    "eslint": "9.15.0",
+    "eslint-plugin-import": "2.31.0",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "typescript-eslint": "^8.15.0",
+    "vitest": "2.1.5"
+  }
+}

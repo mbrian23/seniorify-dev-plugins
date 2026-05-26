@@ -153,6 +153,7 @@ plugins/*/hooks/*.json
 # Scratch & manual-test artifacts
 scratch/
 .DS_Store
+plugins/*/test-tenant-bootstrap.json
 
 # Claude Code local configuration (auto-added)
 .claude/*.local.*
